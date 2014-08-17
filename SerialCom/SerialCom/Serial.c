@@ -15,19 +15,34 @@
 
 #define RX PD0
 #define TX PD1
-#define SERIAL_BUFFER_SIZE 256
+#define SERIAL_BUFFER_SIZE 128
 unsigned char buffer[SERIAL_BUFFER_SIZE];
 int buffer_index = 0;
+int write_buffer_index = 0;
+int write_count = 0;
 
 unsigned char ch;
 
 ISR( USART_RXC_vect )
 {
-	PORTD |= (1 << PD3);
 	buffer[buffer_index] = UDR;
 	buffer_index = (buffer_index+1) % SERIAL_BUFFER_SIZE;
-	PORTD &= ~(1 << PD3);
 }
+
+ISR( USART_UDRE_vect )
+{
+	
+	UDR = buffer[write_buffer_index];
+	write_count--;
+	write_buffer_index = (write_buffer_index+1) % SERIAL_BUFFER_SIZE;
+	if(write_count == 0)
+	{
+		UCSRB &= ~(1<<UDRIE);
+		PORTD &= ~(1 << PD3);
+	}
+	
+}
+
 
 unsigned char serialCheckRxComplete(void)
 {
@@ -65,6 +80,15 @@ void serialWrite(unsigned char DataOut)
 	UDR = DataOut;
 }
 
+void serialBufferWrite(unsigned char *buffer, int count)
+{
+	PORTD |= (1 << PD3);
+	write_buffer_index = 0;
+	write_count = count;
+	UCSRB |= 1<<UDRE;
+	
+}
+
 void establishContact() {
 	while (serialCheckRxComplete() == 0) {
 		serialWrite('A');
@@ -83,6 +107,7 @@ int SerialInit()
 	UCSRC &= ~(1 << URSEL);
 	UBRRH = (unsigned char)((MYUBRR)>>8);
 	UBRRL = (unsigned char) MYUBRR;
+	
 	/* Enable receiver and transmitter   */
 	UCSRB = (1<<RXEN)|(1<<TXEN);
 	/* Frame format: 8data, No parity, 1stop bit */
@@ -99,21 +124,15 @@ int SerialInit()
 	while(1)
 	{
 
-		
-		
-		
 		serialWrite('s');
 		serialWrite('#');
-		for(int i=0; i<SERIAL_BUFFER_SIZE; i++)
-		{
-			serialWrite(buffer[i]);
-		}
+		
+		serialBufferWrite(buffer, SERIAL_BUFFER_SIZE);
+		
 		
 		PORTD |= (1 << PD2);
-
 		_delay_ms(10);
 		PORTD &= ~(1 << PD2);
-
 		_delay_ms(3000);
 
 	  
