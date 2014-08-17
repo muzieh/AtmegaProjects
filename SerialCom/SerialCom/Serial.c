@@ -7,7 +7,7 @@
 #include "Serial.h"
 #include <avr/io.h>
 #include <util/delay.h>
-
+#include <avr/interrupt.h>
 
 
 #define BaudRate 9600
@@ -15,7 +15,19 @@
 
 #define RX PD0
 #define TX PD1
+#define SERIAL_BUFFER_SIZE 256
+unsigned char buffer[SERIAL_BUFFER_SIZE];
+int buffer_index = 0;
 
+unsigned char ch;
+
+ISR( USART_RXC_vect )
+{
+	PORTD |= (1 << PD3);
+	buffer[buffer_index] = UDR;
+	buffer_index = (buffer_index+1) % SERIAL_BUFFER_SIZE;
+	PORTD &= ~(1 << PD3);
+}
 
 unsigned char serialCheckRxComplete(void)
 {
@@ -29,7 +41,7 @@ unsigned char serialCheckTxReady(void)
 
 
 
-unsigned char buffer[5];
+
 
 void serialRead(void)
 {
@@ -67,6 +79,7 @@ int SerialInit()
 	//DDRD |= (1<<TX);
 
 	/*Set baud rate */
+	cli();
 	UCSRC &= ~(1 << URSEL);
 	UBRRH = (unsigned char)((MYUBRR)>>8);
 	UBRRL = (unsigned char) MYUBRR;
@@ -74,8 +87,12 @@ int SerialInit()
 	UCSRB = (1<<RXEN)|(1<<TXEN);
 	/* Frame format: 8data, No parity, 1stop bit */
 	UCSRC |= (1 << URSEL) | (3<<UCSZ0);
+	
+	//enable receiver interrupt
+	UCSRB |= (1<<RXCIE);
 
-	establishContact();
+	sei();
+	//establishContact();
 
 	unsigned char a=0;
 
@@ -86,21 +103,18 @@ int SerialInit()
 		
 		
 		serialWrite('s');
-		serialRead();
-		
 		serialWrite('#');
-		for(int i=0; i<5; i++)
+		for(int i=0; i<SERIAL_BUFFER_SIZE; i++)
 		{
-			
 			serialWrite(buffer[i]);
 		}
 		
 		PORTD |= (1 << PD2);
-		//PORTD |= (1 << PD3);
-		_delay_ms(80);
+
+		_delay_ms(10);
 		PORTD &= ~(1 << PD2);
-		//PORTD &= ~(1 << PD3);
-		_delay_ms(80);
+
+		_delay_ms(3000);
 
 	  
 	}
