@@ -10,7 +10,7 @@
 #include <avr/interrupt.h>
 
 
-#define BaudRate 9600
+#define BaudRate 28800
 #define MYUBRR (F_CPU / 16 / BaudRate ) - 1
 
 #define RX PD0
@@ -102,6 +102,10 @@ int SerialInit()
 	//DDRD &= ~(1<<RX);
 	//DDRD |= (1<<TX);
 
+	for(int i=0; i<SERIAL_BUFFER_SIZE; i++)
+	{
+		buffer[i] = '.';
+	}
 	/*Set baud rate */
 	cli();
 	UCSRC &= ~(1 << URSEL);
